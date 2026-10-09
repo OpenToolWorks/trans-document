@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trans-document"
+version = "0.1.0"
+description = "Local Vietnamese PDF translation WebUI powered by BabelDOC"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+dependencies = [
+    "BabelDOC==0.6.4",
+    "gradio==5.49.1",
+]
+
+[project.scripts]
+trans-document = "trans_document.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trans_document"]
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
