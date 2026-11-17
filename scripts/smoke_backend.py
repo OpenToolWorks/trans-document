@@ -44,21 +44,32 @@ def main():
             root = Path(directory)
             source = root / "source.pdf"
             with pymupdf.open() as document:
-                document.new_page().insert_text((72, 100), "This is a sample document for translation.")
+                for page_number in range(1, 4):
+                    page = document.new_page()
+                    for line in range(20):
+                        page.insert_text(
+                            (72, 60 + line * 30),
+                            f"Page marker {page_number}, line {line + 1}. This is a sample document for translation."
+                        )
                 document.save(source)
             runner = JobRunner(root / "outputs")
-            request = TranslationRequest(str(source), f"http://127.0.0.1:{api.server_port}/v1", "local-test", "dummy")
-            terminal = None
-            for event in runner.stream(request, "smoke"):
-                print(json.dumps(event, ensure_ascii=True), flush=True)
-                terminal = event
-            assert terminal["type"] == "finish", terminal
-            with pymupdf.open(terminal["mono"]) as document:
-                text = document[0].get_text()
-                assert "tài liệu" in text, text
-            with pymupdf.open(terminal["dual"]) as document:
-                assert document.page_count >= 1
-            print("REAL BABELDOC + LOCAL API: PASS")
+            for preview_pages, expected_count in ((2, 2), (None, 3)):
+                request = TranslationRequest(
+                    str(source), f"http://127.0.0.1:{api.server_port}/v1", "local-test", "dummy",
+                    preview_pages=preview_pages,
+                )
+                terminal = None
+                for event in runner.stream(request, "smoke"):
+                    print(json.dumps(event, ensure_ascii=True), flush=True)
+                    terminal = event
+                assert terminal["type"] == "finish", terminal
+                with pymupdf.open(terminal["mono"]) as document:
+                    text = "\n".join(page.get_text() for page in document)
+                    assert document.page_count == expected_count, document.page_count
+                    assert "tài liệu" in text, text
+                with pymupdf.open(terminal["dual"]) as document:
+                    assert document.page_count == expected_count, document.page_count
+            print("REAL BABELDOC TRIAL + FULL TRANSLATION: PASS")
     finally:
         api.shutdown()
         api.server_close()

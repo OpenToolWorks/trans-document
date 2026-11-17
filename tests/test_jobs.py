@@ -12,7 +12,8 @@ from trans_document.jobs import JobRunner, TranslationRequest
 
 def scripted_worker(request, output_dir, connection):
     try:
-        connection.send({"type": "progress", "stage": "Translate Paragraphs", "percent": 40})
+        connection.send({"type": "progress", "stage": "Translate Paragraphs", "percent": 40,
+                         "preview_pages": request.preview_pages})
         if request.model == "blocked":
             time.sleep(60)
         elif request.model == "crash":
@@ -48,6 +49,8 @@ class JobTests(unittest.TestCase):
         self.assertEqual(events[-1]["type"], "finish")
         self.assertTrue(Path(events[-1]["mono"]).is_file())
         self.assertTrue(Path(events[-1]["dual"]).is_file())
+        self.assertTrue(Path(events[-1]["source"]).is_file())
+        self.assertEqual(events[-1]["source"], str(Path(events[-1]["mono"]).parents[1] / "input.pdf"))
         self.assertNotIn("secret-key", repr(self.request))
         self.assertNotIn("secret-key", str(events))
 
@@ -90,6 +93,24 @@ class JobTests(unittest.TestCase):
         ):
             with self.subTest(url=request.base_url), self.assertRaises(ValueError):
                 list(self.runner.stream(request, "session"))
+
+    def test_preview_page_count_validated_before_worker(self):
+        with pymupdf.open() as document:
+            document.new_page()
+            document.new_page()
+            document.new_page()
+            three_pages = self.root / "three-pages.pdf"
+            document.save(three_pages)
+        for pages in (0, 4, True, "2"):
+            with self.subTest(pages=pages), self.assertRaises(ValueError):
+                list(self.runner.stream(replace(self.request, preview_pages=pages), "session"))
+        request = replace(self.request, pdf_path=str(three_pages), preview_pages=3)
+        self.assertEqual(list(self.runner.stream(request, "session"))[-1]["type"], "finish")
+
+    def test_preview_request_reaches_worker(self):
+        event = next(event for event in self.runner.stream(
+            replace(self.request, preview_pages=1), "session") if "preview_pages" in event)
+        self.assertEqual(event["preview_pages"], 1)
 
 
 if __name__ == "__main__":

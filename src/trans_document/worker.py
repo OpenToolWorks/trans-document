@@ -39,6 +39,8 @@ def translate_worker(request, output_dir, connection):
             watermark_output_mode=WatermarkOutputMode.NoWatermark,
             use_rich_pbar=False, auto_extract_glossary=False,
             qps=2, pool_max_workers=2, report_interval=0.5,
+            pages=f"1-{request.preview_pages}" if request.preview_pages else None,
+            only_include_translated_page=bool(request.preview_pages),
         )
 
         async def run():
@@ -63,6 +65,31 @@ def translate_worker(request, output_dir, connection):
         if translator is not None:
             translator.client.close()
         connection.close()
+
+
+def check_connection(base_url, model, api_key):
+    import httpx
+    import openai
+
+    client = None
+    try:
+        client = openai.OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            http_client=httpx.Client(timeout=10, follow_redirects=False),
+            timeout=10,
+            max_retries=0,
+        )
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Hello"}],
+        )
+        return "ok" if response.choices[0].message.content else "backend"
+    except Exception as error:
+        return _error_code(error)
+    finally:
+        if client is not None:
+            client.close()
 
 
 def _error_code(error):

@@ -7,10 +7,10 @@ import threading
 import uuid
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import pymupdf
 
+from .profiles import validate_base_url
 from .worker import translate_worker
 
 
@@ -22,17 +22,21 @@ class TranslationRequest:
     api_key: str = field(repr=False)
     lang_in: str = "en"
     lang_out: str = "vi"
+    preview_pages: int | None = None
 
     def validate(self):
-        url = urlsplit(self.base_url)
-        if (url.scheme not in {"http", "https"} or not url.hostname
-                or url.username or url.password or url.query or url.fragment):
-            raise ValueError("Base URL phải là HTTP/HTTPS, không chứa key, query hoặc fragment.")
+        validate_base_url(self.base_url)
         if not self.model.strip() or not self.api_key.strip():
             raise ValueError("Vui lòng nhập model và API key.")
         if not self.lang_in or not self.lang_out or self.lang_in == self.lang_out:
             raise ValueError("Chọn hai ngôn ngữ khác nhau.")
-        _check_pdf(self.pdf_path)
+        page_count = pdf_page_count(self.pdf_path)
+        if self.preview_pages is not None and (
+            isinstance(self.preview_pages, bool) or not isinstance(self.preview_pages, int)
+            or not 1 <= self.preview_pages <= 3
+            or self.preview_pages > page_count
+        ):
+            raise ValueError("Chọn từ 1 đến 3 trang đầu và không vượt số trang trong PDF.")
 
 
 def _check_pdf(path):
@@ -40,8 +44,13 @@ def _check_pdf(path):
         with pymupdf.open(path) as document:
             if not document.is_pdf or document.needs_pass or document.page_count < 1:
                 raise ValueError
+            return document.page_count
     except Exception:
         raise ValueError("PDF không hợp lệ, trống hoặc có mật khẩu.") from None
+
+
+def pdf_page_count(path):
+    return _check_pdf(path)
 
 
 @dataclass
@@ -112,7 +121,8 @@ class JobRunner:
                         yield {"type": "error", "code": "output"}
                         return
                     success = True
-                    yield {"type": "finish", "mono": str(paths[0]), "dual": str(paths[1])}
+                    yield {"type": "finish", "mono": str(paths[0]), "dual": str(paths[1]),
+                           "source": str(source)}
                     return
                 if event.get("type") == "error":
                     code = event.get("code")

@@ -1,6 +1,6 @@
 # TransDocument
 
-WebUI tiếng Việt chạy local, dùng **BabelDOC 0.6.4** để phân tích PDF, bảo toàn công thức và dàn trang. Dịch text bằng Gemini hoặc dịch vụ OpenAI-compatible do bạn cấu hình trên UI. Tạo PDF bản dịch và PDF song ngữ.
+WebUI tiếng Việt chạy local, dùng **BabelDOC 0.6.4** để phân tích PDF, bảo toàn công thức và dàn trang. Dịch text bằng Gemini, OpenAI hoặc dịch vụ OpenAI-compatible. Tạo PDF bản dịch và PDF song ngữ.
 
 ## Chạy trên Windows
 
@@ -16,14 +16,20 @@ Môi trường `.venv` đã được tạo nếu bạn đang sử dụng checkou
 
 Mở **http://127.0.0.1:7860** nếu trình duyệt chưa tự mở. Dừng ứng dụng bằng `Ctrl+C` trong terminal.
 
+## Cài đặt API
+
+Mở tab **Cài đặt API** để thêm, sửa, kiểm tra, đặt mặc định hoặc xóa kết nối. Có preset cho Gemini và OpenAI. Cấu hình dịch vụ được lưu tại `%LOCALAPPDATA%\TransDocument\profiles.json` trên Windows. File chỉ chứa tên, nhà cung cấp, Base URL, model và ID kết nối, không có API key.
+
+Nhập key rồi bấm **Lưu kết nối**. Key chỉ giữ trong phiên trình duyệt hiện tại. Tải lại trang, đóng tab hoặc khởi động lại ứng dụng thì cần nhập lại key. Mỗi tab có key riêng. Bấm **Kiểm tra kết nối** để gửi yêu cầu ngắn `Hello`; yêu cầu này có thể tính vào quota của dịch vụ.
+
 ## Dịch một PDF
 
-1. Chọn PDF, ngôn ngữ nguồn/đích (mặc định Anh → Việt).
-2. Nhập Base URL, model và API key. Ô key che nội dung và không lưu key xuống file.
-3. Bấm **Dịch PDF**, xem tiến trình từng giai đoạn. Có thể bấm **Hủy** cả trong lúc đang chờ API.
-4. Tải **PDF bản dịch** hoặc **PDF song ngữ** khi hoàn tất.
+1. Chọn PDF, ngôn ngữ nguồn/đích (mặc định Anh → Việt) và kết nối API.
+2. Chọn **Toàn bộ tài liệu** hoặc dịch thử 1–3 trang đầu để xem thử kết quả.
+3. Bấm **Dịch PDF**, theo dõi tiến trình từng giai đoạn. Có thể bấm **Hủy** khi tác vụ đang chạy.
+4. Xem ảnh trang đầu của bản gốc và bản dịch, rồi tải **PDF bản dịch** hoặc **PDF song ngữ**.
 
-Gemini (cấu hình mặc định):
+Gemini (kết nối mặc định ban đầu):
 
 ```text
 Base URL: https://generativelanguage.googleapis.com/v1beta/openai/
@@ -31,7 +37,7 @@ Model:    gemini-3.1-flash-lite
 ```
 
 Bạn có thể thay bằng endpoint/model OpenAI-compatible khác. Khả năng dùng model phụ thuộc dịch vụ và quyền của API key.
-Ứng dụng gửi một yêu cầu dịch ngắn `Hello` trước khi xử lý PDF để kiểm tra API; yêu cầu này cũng tính vào quota của dịch vụ.
+Ứng dụng gửi yêu cầu dịch ngắn `Hello` trước khi xử lý PDF để kiểm tra API; yêu cầu này cũng tính vào quota của dịch vụ.
 
 ## File, model và cache
 
@@ -40,7 +46,7 @@ Bạn có thể thay bằng endpoint/model OpenAI-compatible khác. Khả năng 
 - Mỗi tác vụ có thư mục `outputs/<job-id>/` riêng. Tác vụ lỗi/hủy không cung cấp PDF dở dang.
 - Job thành công giữ bản input và kết quả trong `outputs/`. Xóa thư mục job khi không cần nữa.
 - BabelDOC quản lý cache model/font và bản dịch riêng, thường dưới thư mục cache của người dùng. Translation cache có thể chứa text nguồn/đích; không chứa API key do ứng dụng truyền vào.
-- Một tác vụ chạy tại một thời điểm. API key chỉ nằm trong bộ nhớ của trình duyệt/server/worker trong phiên; tải lại trang để xóa ô nhập.
+- Một tác vụ chạy tại một thời điểm. API key chỉ nằm trong bộ nhớ phiên trình duyệt/server/worker; tải lại trang sẽ yêu cầu nhập lại key.
 - Worker không in raw lỗi provider hoặc text ra application log; UI hiển thị nhóm lỗi (key/quota/kết nối/PDF/backend).
 
 ## Kiểm tra
@@ -61,9 +67,12 @@ Kiểm tra tích hợp BabelDOC thật với endpoint giả lập local (không 
 
 ```text
 src/trans_document/
-  app.py          Gradio UI và hiển thị tiến trình
+  app.py          Gradio UI, cài đặt API và hiển thị tiến trình
   jobs.py         Validation, thư mục job, multiprocessing và hủy
-  worker.py       OpenAITranslator + TranslationConfig + async_translate
+  profiles.py     Metadata kết nối API lưu trên máy, không lưu key
+  preview.py      Ảnh xem trước PDF giới hạn độ phân giải
+  ui.css          Bố cục responsive cho giao diện
+  worker.py       Kiểm tra API và BabelDOC translator/config
   __main__.py     Entry point: python -m trans_document
 tests/            Kiểm tra tự động không gọi API trả phí
 scripts/

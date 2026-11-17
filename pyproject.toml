@@ -12,6 +12,7 @@ license = "AGPL-3.0-only"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 dependencies = [
     "BabelDOC==0.6.4",
+    "bitstring>=4.3,<5",
     "gradio==5.49.1",
 ]
 
@@ -20,6 +21,9 @@ trans-document = "trans_document.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/trans_document"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/trans_document/ui.css" = "trans_document/ui.css"
 
 [tool.ruff]
 src = ["src"]
